@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mining Dashboard v9 (AutoSave)</title>
+    <title>Mining Dashboard v12 (Fix Nama)</title>
     <style>
         /* --- CSS BASE --- */
         :root { --primary: #4f46e5; --bg: #f1f5f9; --slate-900: #0f172a; }
@@ -11,7 +11,7 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: #1e293b; margin: 0; padding: 0; height: 100vh; overflow: hidden; }
 
         /* NAVIGASI */
-        .page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; background: var(--bg); display: none; padding-bottom: 100px; }
+        .page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; background: var(--bg); display: none; padding-bottom: 120px; }
         .page.active { display: block; }
         .navbar { background: var(--slate-900); color: white; padding: 16px; position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
@@ -25,9 +25,11 @@
         .input-base { width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; font-weight: 600; outline: none; margin-bottom: 8px; }
         .input-manual { width: 100%; border: none; border-bottom: 1px solid #e2e8f0; padding: 4px 0; outline: none; font-size: 14px; }
         
-        /* CHIPS */
-        .chip-label input:checked + div { background-color: var(--primary); color: white; border-color: var(--primary); }
-        .chip-div { padding: 4px 10px; border-radius: 99px; border: 1px solid #cbd5e1; background: white; color: #64748b; font-size: 11px; font-weight: 700; display: inline-block; margin-right: 4px; margin-bottom: 4px; cursor: pointer; }
+        /* CHIPS (LOGIKA BARU) */
+        .chip-label { position: relative; display: inline-block; margin-right: 4px; margin-bottom: 4px; }
+        .chip-label input { position: absolute; opacity: 0; cursor: pointer; height: 100%; width: 100%; left:0; top:0; z-index: 10; } 
+        .chip-div { padding: 4px 10px; border-radius: 99px; border: 1px solid #cbd5e1; background: white; color: #64748b; font-size: 11px; font-weight: 700; transition: 0.2s; position: relative; z-index: 1; }
+        .chip-label input:checked + .chip-div { background-color: var(--primary); color: white; border-color: var(--primary); }
 
         /* CONVEYOR */
         .tab-scroll { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 5px; margin-bottom: 10px; }
@@ -46,7 +48,13 @@
         
         /* UTILS */
         .fab-add { position: fixed; bottom: 24px; right: 24px; background: var(--primary); color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); z-index: 100; cursor: pointer; }
-        .history-item { background: white; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        /* HISTORY ITEM */
+        .history-item { background: white; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; }
+        .history-info { flex: 1; }
+        .history-actions { display: flex; gap: 10px; align-items: center; }
+        .btn-del-hist { background: #fee2e2; border: 1px solid #fecaca; color: #ef4444; width: 36px; height: 36px; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
         .hidden { display: none; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         
@@ -64,7 +72,7 @@
 
     <div id="page-home" class="page active">
         <div class="navbar">
-            <div><h1 style="margin:0; font-size:18px;">Mining Dashboard</h1><span style="font-size:10px; opacity:0.8">v9.0 AutoSave</span></div>
+            <div><h1 style="margin:0; font-size:18px;">Mining Dashboard</h1><span style="font-size:10px; opacity:0.8">v12.0 Fix Nama</span></div>
             <button onclick="nav('settings')" style="background:none; border:none; font-size:20px;">⚙️</button>
         </div>
         <div class="container">
@@ -228,6 +236,7 @@
         function delM(k, idx) { if(confirm('Hapus?')) { masters[k].splice(idx,1); saveM(); } }
 
         function renderFormUI() {
+            // FIX: Render HTML with Text Content clear for grabbing later
             const renC = (id, l) => document.getElementById(id).innerHTML = l.map(t=>`<label class="chip-label"><input type="checkbox" value="${t}" class="hidden"><div class="chip-div">${t}</div></label>`).join('');
             renC('box-spv', masters.spv); renC('box-frm', masters.frm); renC('box-chk', masters.chk);
 
@@ -293,101 +302,162 @@
             document.getElementById('grand-total').innerText="0";
         }
 
-        function manualSave() { saveData(); alert('Tersimpan!'); nav('home'); }
+        // --- CORE DATA FUNCTION (FIX NAMA) ---
+        function ambilDataForm() {
+            // FIX: Retrieve Text from Sibling Div instead of Value
+            const getC = (id) => {
+                const arr = Array.from(document.querySelectorAll(`#${id} input:checked`)).map(e => {
+                    // This is the fix: Grab innerText from the next sibling (chip-div)
+                    return e.nextElementSibling.innerText;
+                });
+                return arr;
+            };
+            const val = (id) => document.getElementById(id).value;
 
-        function saveData() {
-            const getC=(id)=>Array.from(document.querySelectorAll(`#${id} input:checked`)).map(e=>e.value);
-            const val=(id)=>document.getElementById(id).value;
-            let ptD={}; masters.pt.forEach(p=>{ ptD[p]={rs:val(`run-s-${p}`),ts:val(`trip-s-${p}`),rm:val(`run-m-${p}`),tm:val(`trip-m-${p}`)}});
-            
-            // Total calculation for history summary
-            let totalTrip = 0;
-            masters.pt.forEach(p=> totalTrip+=(val(`trip-m-${p}`)-val(`trip-s-${p}`)));
+            let ptD = {}; 
+            let tTrip = 0;
+            masters.pt.forEach(p => { 
+                ptD[p] = {rs:val(`run-s-${p}`), ts:val(`trip-s-${p}`), rm:val(`run-m-${p}`), tm:val(`trip-m-${p}`)};
+                tTrip += (val(`trip-m-${p}`) - val(`trip-s-${p}`));
+            });
 
-            const d={
+            return {
                 id: currentId || Date.now(),
                 date: val('inpDate'), shift: val('inpShift'),
                 spv: getC('box-spv'), spv_m: val('inpSpvM'),
                 frm: getC('box-frm'), frm_m: val('inpFrmM'),
                 chk: getC('box-chk'), chk_m: val('inpChkM'),
-                rom: {tip:val('inpTip'),trans:val('inpTrans')},
+                rom: {tip:val('inpTip'), trans:val('inpTrans')},
                 conv: convData, pt: ptD, sdt: sdtData,
-                totalTrip: document.getElementById('grand-total').innerText
+                total: tTrip
             };
-            
-            let h=JSON.parse(localStorage.getItem('m_v9')||'[]'); 
-            if(currentId){
-                const i=h.findIndex(x=>x.id===currentId);
-                if(i>-1) h[i]=d;
+        }
+
+        function manualSave() { 
+            const d = ambilDataForm();
+            simpanKeLS(d);
+            alert('Tersimpan!'); 
+            nav('home'); 
+        }
+
+        function simpanKeLS(data) {
+            let h = JSON.parse(localStorage.getItem('m_v12')||'[]');
+            const idx = h.findIndex(x => x.id === data.id);
+            if(idx > -1) {
+                h[idx] = data;
             } else {
-                h.unshift(d);
-                currentId = d.id; // Set ID agar tidak duplikat jika ditekan save lagi
+                h.unshift(data);
+                currentId = data.id; 
             }
-            
-            localStorage.setItem('m_v9',JSON.stringify(h));
+            localStorage.setItem('m_v12', JSON.stringify(h));
         }
 
         function loadHistoryList() {
-            const h=JSON.parse(localStorage.getItem('m_v9')||'[]');
+            const h = JSON.parse(localStorage.getItem('m_v12')||'[]');
             const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
             const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-            
-            document.getElementById('history-list').innerHTML=h.map(d => {
+
+            document.getElementById('history-list').innerHTML = h.map(d => {
                 const dateObj = new Date(d.date);
-                const dateStr = d.date ? `${days[dateObj.getDay()]}, ${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}` : 'Tanpa Tanggal';
-                
+                const displayDate = d.date ? `${days[dateObj.getDay()]}, ${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}` : 'Tanpa Tanggal';
+
                 return `
                 <div class="history-item" onclick="openForm(${d.id})">
-                    <div>
-                        <div style="font-weight:bold; font-size:16px;">${dateStr}</div>
+                    <div class="history-info">
+                        <div style="font-weight:bold; font-size:16px;">${displayDate}</div>
                         <div style="font-size:12px; color:#64748b; margin-top:4px;">${d.shift}</div>
-                        <div style="font-size:12px; font-weight:bold; color:var(--primary); margin-top:4px;">Total Hauling: ${d.totalTrip}</div>
+                        <div style="font-size:12px; font-weight:bold; color:var(--primary); margin-top:4px;">Total Hauling: ${d.total} Trip</div>
                     </div>
-                    <div style="font-size:20px; color:#cbd5e1;">✏️</div>
+                    <div class="history-actions">
+                        <button class="btn-del-hist" onclick="delHist(event, ${d.id})">🗑️</button>
+                        <div style="font-size:20px; color:#cbd5e1;">✏️</div>
+                    </div>
                 </div>`;
             }).join('');
-            document.getElementById('empty-msg').style.display=h.length?'none':'block';
+            document.getElementById('empty-msg').style.display = h.length ? 'none' : 'block';
+        }
+
+        function delHist(e, id) {
+            e.stopPropagation();
+            if(confirm('Hapus laporan ini secara permanen?')) {
+                let h = JSON.parse(localStorage.getItem('m_v12')||'[]');
+                h = h.filter(x => x.id !== id);
+                localStorage.setItem('m_v12', JSON.stringify(h));
+                loadHistoryList();
+            }
         }
 
         function loadFormData(id) {
-            const d=JSON.parse(localStorage.getItem('m_v9')).find(x=>x.id===id); if(!d)return;
-            resetForm(); document.getElementById('inpDate').value=d.date; document.getElementById('inpShift').value=d.shift;
-            const sC=(b,a)=>document.querySelectorAll(`#${b} input`).forEach(i=>{if(a.includes(i.value))i.checked=true;});
-            sC('box-spv',d.spv); document.getElementById('inpSpvM').value=d.spv_m;
-            sC('box-frm',d.frm); document.getElementById('inpFrmM').value=d.frm_m;
-            sC('box-chk',d.chk); document.getElementById('inpChkM').value=d.chk_m;
-            document.getElementById('inpTip').value=d.rom.tip; document.getElementById('inpTrans').value=d.rom.trans;
-            convData=d.conv; renderConvRows(masters.conv[0]);
-            masters.pt.forEach(p=>{ if(d.pt[p]){ document.getElementById(`run-s-${p}`).value=d.pt[p].rs; document.getElementById(`trip-s-${p}`).value=d.pt[p].ts; document.getElementById(`run-m-${p}`).value=d.pt[p].rm; document.getElementById(`trip-m-${p}`).value=d.pt[p].tm; calcHauling(p); }});
-            sdtData=d.sdt; renderSdt();
+            const d = JSON.parse(localStorage.getItem('m_v12')).find(x => x.id === id); if(!d) return;
+            resetForm(); 
+            document.getElementById('inpDate').value = d.date; 
+            document.getElementById('inpShift').value = d.shift;
+
+            // Load Chips (FIXED MATCHING)
+            const sC = (box, arr) => document.querySelectorAll(`#${box} input`).forEach(i => { 
+                // Compare with Sibling Text
+                if(arr.includes(i.nextElementSibling.innerText)) i.checked = true; 
+            });
+            sC('box-spv', d.spv); document.getElementById('inpSpvM').value = d.spv_m;
+            sC('box-frm', d.frm); document.getElementById('inpFrmM').value = d.frm_m;
+            sC('box-chk', d.chk); document.getElementById('inpChkM').value = d.chk_m;
+
+            document.getElementById('inpTip').value = d.rom.tip; 
+            document.getElementById('inpTrans').value = d.rom.trans;
+            
+            convData = d.conv; 
+            renderConvRows(masters.conv[0]);
+            
+            masters.pt.forEach(p => { 
+                if(d.pt[p]){ 
+                    document.getElementById(`run-s-${p}`).value = d.pt[p].rs; 
+                    document.getElementById(`trip-s-${p}`).value = d.pt[p].ts; 
+                    document.getElementById(`run-m-${p}`).value = d.pt[p].rm; 
+                    document.getElementById(`trip-m-${p}`).value = d.pt[p].tm; 
+                    calcHauling(p); 
+                }
+            });
+            
+            sdtData = d.sdt; 
+            renderSdt();
         }
 
         function renderSettings() {
-            const ren=(k,a)=>document.getElementById(`list-m-${k}`).innerHTML=a.map((x,i)=>`<div class="master-list-item"><span>${x}</span><button onclick="delM('${k}',${i})" class="btn-del">Hapus</button></div>`).join('');
-            ren('spv',masters.spv); ren('frm',masters.frm); ren('chk',masters.chk); ren('conv',masters.conv); ren('pt',masters.pt); ren('unit',masters.unit); ren('driver',masters.driver);
+            const ren = (k, a) => document.getElementById(`list-m-${k}`).innerHTML = a.map((x, i) => `<div class="master-list-item"><span>${x}</span><button onclick="delM('${k}',${i})" class="btn-del">Hapus</button></div>`).join('');
+            ren('spv', masters.spv); ren('frm', masters.frm); ren('chk', masters.chk); ren('conv', masters.conv); ren('pt', masters.pt); ren('unit', masters.unit); ren('driver', masters.driver);
         }
 
-        // --- COPY REPORT ---
+        // --- NEW COPY REPORT (USING CENTRALIZED DATA) ---
         function copyReport(isMalam) {
-            // AUTO SAVE FIRST
-            saveData();
+            const d = ambilDataForm();
+            simpanKeLS(d); // Auto Save
 
-            const fmtDate = (ds) => { if(!ds) return '-'; const d = new Date(ds); const m = ["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"]; return `${d.getDate()}/${m[d.getMonth()]}/${d.getFullYear().toString().substr(-2)}`; };
-            const joinArr = (box, man) => { const arr = Array.from(document.querySelectorAll(`#${box} input:checked`)).map(e => e.value); const m = document.getElementById(man).value.trim(); if(m) arr.push(m); return arr.join(', '); };
-            const valNum = (id) => parseFloat(document.getElementById(id).value)||0;
-
-            const shift = document.getElementById('inpShift').value;
-            const dateStr = document.getElementById('inpDate').value;
+            const fmtDate = (ds) => { if(!ds) return '-'; const dt = new Date(ds); const m = ["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"]; return `${dt.getDate()}/${m[dt.getMonth()]}/${dt.getFullYear().toString().substr(-2)}`; };
             
-            let txt = `*CHP OPERATION*\n*${shift}*\n*${fmtDate(dateStr)}*\n\n`;
-            txt += `*Supervisor* : ${joinArr('box-spv','inpSpvM')}\n`;
-            txt += `*Foreman* : ${joinArr('box-frm','inpFrmM')}\n`;
-            txt += `*Checker* : ${joinArr('box-chk','inpChkM')}\n\n`;
+            const joinPers = (arr, man) => {
+                // Filter out empty strings first
+                let list = arr.filter(item => item && item.trim() !== "");
+                if(man && man.trim()) list.push(man.trim());
+                return list.length ? list.join(', ') : '-';
+            };
+
+            let txt = `*CHP OPERATION*\n*${d.shift}*\n*${fmtDate(d.date)}*\n\n`;
+            txt += `*Supervisor* : ${joinPers(d.spv, d.spv_m)}\n`;
+            txt += `*Foreman* : ${joinPers(d.frm, d.frm_m)}\n`;
+            txt += `*Checker* : ${joinPers(d.chk, d.chk_m)}\n\n`;
 
             txt += `*Efektivitas RUNNING*\n`;
             masters.conv.forEach(sd => {
-                let tot=0; (convData[sd]||[]).forEach(d => { if(d.sh){ let s=parseInt(d.sh)*60+parseInt(d.sm), f=parseInt(d.fh)*60+parseInt(d.fm); if(f<s) f+=1440; tot+=(f-s); }});
-                const th=Math.floor(tot/60), tm=tot%60;
+                let tot = 0;
+                (d.conv[sd]||[]).forEach(item => { 
+                    if(item.sh){ 
+                        let s = parseInt(item.sh)*60+parseInt(item.sm);
+                        let f = parseInt(item.fh)*60+parseInt(item.fm);
+                        if(f < s) f += 1440; 
+                        tot += (f - s); 
+                    }
+                });
+                const th = Math.floor(tot/60), tm = tot%60;
                 if(tot === 0) txt += `- ${sd} = -\n`;
                 else txt += `- ${sd} = ${th} Jam ${tm} Menit\n`;
             });
@@ -395,7 +465,9 @@
             txt += `\n*HAULING*\n`;
             let totalHauling = 0;
             masters.pt.forEach(pt => {
-                const ts = valNum(`trip-s-${pt}`), tm = valNum(`trip-m-${pt}`);
+                const pData = d.pt[pt];
+                const ts = parseFloat(pData.ts)||0;
+                const tm = parseFloat(pData.tm)||0;
                 const tripResult = isMalam ? (tm - ts) : ts;
                 totalHauling += tripResult;
                 txt += `- ${pt.padEnd(5)} = ${tripResult > 0 ? tripResult + ' TRIP' : '- TRIP'}\n`;
@@ -403,17 +475,19 @@
 
             txt += `\n*UNIT 2 TRIP*\n`;
             masters.pt.forEach(pt => {
-                 const resId = isMalam ? `res-m-${pt}` : `res-s-${pt}`;
-                 const val = document.getElementById(resId).innerText;
-                 txt += `- ${pt.padEnd(5)} = ${val != '0' ? val + ' Unit' : '- Unit'}\n`;
+                 const pData = d.pt[pt];
+                 const rs = parseFloat(pData.rs)||0; const ts = parseFloat(pData.ts)||0;
+                 const rm = parseFloat(pData.rm)||0; const tm = parseFloat(pData.tm)||0;
+                 let uResult = isMalam ? (tm - ts) - rm : ts - rs;
+                 txt += `- ${pt.padEnd(5)} = ${uResult != 0 ? uResult + ' Unit' : '- Unit'}\n`;
             });
 
             txt += `\n*TRIP SDT TRANSFER*\n`;
-            if(sdtData.length === 0) txt += `-\n`;
-            else sdtData.forEach(d => txt += `- ${d.unit} (${d.driver||'-'}) : ${d.trip||'-'} Trip ${d.ket?`*${d.ket}*`:''}\n`);
+            if(d.sdt.length === 0) txt += `-\n`;
+            else d.sdt.forEach(x => txt += `- ${x.unit} (${x.driver||'-'}) : ${x.trip||'-'} Trip ${x.ket?`*${x.ket}*`:''}\n`);
 
-            const tip = valNum('inpTip');
-            const trans = valNum('inpTrans');
+            const tip = parseFloat(d.rom.tip)||0;
+            const trans = parseFloat(d.rom.trans)||0;
             const totalAll = trans + totalHauling;
 
             txt += `\n\n*TOTAL HAULING   = ${totalHauling > 0 ? totalHauling + ' Trip' : '- Trip'}*\n`;
@@ -423,7 +497,8 @@
 
             const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select();
             document.execCommand('copy'); document.body.removeChild(ta);
-            alert("Laporan Disalin & Disimpan ke Riwayat!");
+            
+            alert("Laporan Disalin & Disimpan!");
         }
     </script>
 </body>
